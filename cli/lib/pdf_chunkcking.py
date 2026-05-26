@@ -1,4 +1,5 @@
 import numpy as np
+import re
 import json
 import os
 from sentence_transformers import SentenceTransformer
@@ -26,7 +27,11 @@ class PdfChunkSearch:
             if not text.strip():
                 continue
 
+        doc_chunks = semantic_chunk(text)
 
+        for i, chunk in enumerate(doc_chunks):
+            all_chunks.append(chunk)
+            metadata.append() 
 
 def semantic_chunk(
         text: str,
@@ -35,4 +40,23 @@ def semantic_chunk(
     text.strip()
     if not text:
         return []
+
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+
+    chunks = []
+    i = 0
+    while i < len(sentences):
+        if len(sentences) == 1 and not sentences[0].endswith((".", "!", "?")):
+            chunk_sentences = sentences[0]
+            chunk = chunk_sentences.strip()
+        else:
+            chunk_sentences = sentences[i : i + max_chunk_size]
+            if chunks and len(chunk_sentences) <= overlap:
+                break
+            chunk = " ".join(chunk_sentences).strip()
+        if chunk:
+            chunks.append(chunk)
+        i += max_chunk_size - overlap
+
+    return chunks
 
