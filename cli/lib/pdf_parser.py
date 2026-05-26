@@ -3,6 +3,7 @@ import os
 import pdfplumber
 from pathlib import Path
 import json
+import uuid
 
 def restructure_table(table: list) -> str:
     new_table = []
@@ -17,6 +18,7 @@ def restructure_table(table: list) -> str:
 def parse_pdf(file_path: str | Path | os.PathLike) -> list[dict]:
     page_data = []
     file = os.path.basename(file_path)
+    file_id = uuid.uuid4()
     with pdfplumber.open(file_path) as pdf:
         pages = pdf.pages
         for page in pages:
@@ -29,6 +31,7 @@ def parse_pdf(file_path: str | Path | os.PathLike) -> list[dict]:
                 restructured_tables.append(restruct_table)
 
             page_data.append({
+                "id": file_id,
                 "file_name": file,
                 "page": page.page_number,
                 "text": text,
@@ -46,6 +49,7 @@ def parse_all_pdfs(documents_path: str | Path | os.PathLike = PDF_TESTING_PATH,
         doc_path = os.path.join(documents_path, doc)
         doc_data = parse_pdf(doc_path)
         for data in doc_data:
+
             all_pdf_data.append(data)
 
     with open(cache_path, 'w') as cache:
