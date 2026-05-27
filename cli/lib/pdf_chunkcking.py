@@ -3,7 +3,12 @@ import re
 import json
 import os
 from sentence_transformers import SentenceTransformer
-from search_utils import DEFAULT_SEMANTIC_CHUNK_SIZE, DEFAULT_CHUNK_OVERLAP
+from search_utils import (
+    DEFAULT_SEMANTIC_CHUNK_SIZE,
+    DEFAULT_CHUNK_OVERLAP,
+    CHUNK_EMBEDDINGS_PATH,
+    CHUNK_METADATA_PATH,
+    )
 
 class PdfChunkSearch:
     def __init__(self, model_name = 'all-MiniLM-L6-v2') -> None:
@@ -22,16 +27,44 @@ class PdfChunkSearch:
         all_chunks = []
         metadata = []
 
-        for idx, doc in enumerate(documents):
+        for doc in documents:
             text = doc.get("text", "")
             if not text.strip():
                 continue
 
-        doc_chunks = semantic_chunk(text)
+            doc_chunks = semantic_chunk(text)
 
-        for i, chunk in enumerate(doc_chunks):
-            all_chunks.append(chunk)
-            metadata.append() 
+            for i, chunk in enumerate(doc_chunks):
+                all_chunks.append(chunk)
+                metadata.append({
+                    "document_id": doc["id"],
+                    "chunk_id": i,
+                    "total_chunks": len(doc_chunks)
+                })
+        self.chunk_embeddings = self.model.encode(all_chunks, show_progress_bar=True)
+        self.chunk_metadata = metadata
+
+        os.makedirs(os.path.dirname(CHUNK_EMBEDDINGS_PATH), exist_ok=True)
+        np.save(CHUNK_EMBEDDINGS_PATH, self.chunk_embeddings)
+        with open(CHUNK_METADATA_PATH, "w") as f:
+            json.dump({"chunks": metadata, "total_chunks": len(all_chunks)}, f, indent=2)
+
+        return self.chunk_embeddings
+
+    def load_or_create_chunk_embeddings(self, documents: list[dict]) -> np.array:
+        self.documents = documents
+        self.document_map = {}
+        for doc in documents:
+            self.document_map[doc["id"]] = doc
+
+        if os.path.exists(CHUNK_EMBEDDINGS_PATH) and os.path.exists(CHUNK_METADATA_PATH):
+            self.chunk_embeddings = np.load(CHUNK_EMBEDDINGS_PATH)
+            with open(CHUNK_METADATA_PATH, 'r') as meta_data_file:
+                data = json.load(meta_data_file)
+                self.chunk_metadata = data["chunks"]
+            return self.chunk_embeddings
+
+        return self.build_chunk_embeddings(documents)
 
 def semantic_chunk(
         text: str,
