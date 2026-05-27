@@ -8,6 +8,7 @@ from search_utils import (
     DEFAULT_CHUNK_OVERLAP,
     CHUNK_EMBEDDINGS_PATH,
     CHUNK_METADATA_PATH,
+    load_parsed_pdfs,
     )
 
 class PdfChunkSearch:
@@ -29,6 +30,7 @@ class PdfChunkSearch:
 
         for doc in documents:
             text = doc.get("text", "")
+            #Need to add table chunking here
             if not text.strip():
                 continue
 
@@ -93,3 +95,10 @@ def semantic_chunk(
 
     return chunks
 
+def try_pdf_chunking():
+    pdf_chunk_search = PdfChunkSearch()
+    pdf_data = load_parsed_pdfs()
+    return pdf_chunk_search.load_or_create_chunk_embeddings(pdf_data)
+
+if __name__ == "__main__":
+    try_pdf_chunking()
