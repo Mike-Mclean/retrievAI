@@ -31,7 +31,7 @@ def parse_pdf(file_path: str | Path | os.PathLike) -> list[dict]:
                 restructured_tables.append(restruct_table)
 
             page_data.append({
-                "id": file_id,
+                "id": str(file_id),
                 "file_name": file,
                 "page": page.page_number,
                 "text": text,

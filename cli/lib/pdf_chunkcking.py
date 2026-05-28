@@ -30,16 +30,18 @@ class PdfChunkSearch:
 
         for doc in documents:
             text = doc.get("text", "")
-            #Need to add table chunking here
+
             if not text.strip():
                 continue
 
             doc_chunks = semantic_chunk(text)
 
-            for i, chunk in enumerate(doc_chunks):
+            for i, chunk in enumerate(doc_chunks, 1):
                 all_chunks.append(chunk)
                 metadata.append({
                     "document_id": doc["id"],
+                    "document_title": doc["file_name"],
+                    "page_number": doc["page"],
                     "chunk_id": i,
                     "total_chunks": len(doc_chunks)
                 })
@@ -76,6 +78,7 @@ def semantic_chunk(
     if not text:
         return []
 
+    text = normalize_pdf_text(text)
     sentences = re.split(r"(?<=[.!?])\s+", text)
 
     chunks = []
@@ -94,6 +97,12 @@ def semantic_chunk(
         i += max_chunk_size - overlap
 
     return chunks
+
+def normalize_pdf_text(text):
+    text = re.sub(r"-\n", "", text)
+    text = re.sub(r"(?<![.!?:])\n(?![A-Z\d])", " ", text)
+    text = re.sub(r"\n(?=[A-Z\d])", "\n", text)
+    return text.strip()
 
 def try_pdf_chunking():
     pdf_chunk_search = PdfChunkSearch()
