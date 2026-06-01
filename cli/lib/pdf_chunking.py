@@ -3,7 +3,7 @@ import re
 import json
 import os
 from sentence_transformers import SentenceTransformer
-from search_utils import (
+from .search_utils import (
     DEFAULT_SEMANTIC_CHUNK_SIZE,
     DEFAULT_CHUNK_OVERLAP,
     CHUNK_EMBEDDINGS_PATH,
@@ -104,10 +104,88 @@ def normalize_pdf_text(text):
     text = re.sub(r"\n(?=[A-Z\d])", "\n", text)
     return text.strip()
 
-def try_pdf_chunking():
-    pdf_chunk_search = PdfChunkSearch()
-    pdf_data = load_parsed_pdfs()
-    return pdf_chunk_search.load_or_create_chunk_embeddings(pdf_data)
+def detect_chunk_boundaries(text):
+    boundaries = []
+    patterns =[
+        # Numbered headings: "1.", "1.1", "A.", "IV."
+        (r"(?m)^(?:[A-Z]{1,4}\.|[IVXLC]+\.|[\d]+(?:\.[\d]+)*\.?)\s+[A-Z]", "numbered_heading"),
+        # ALL CAPS lines (section titles, exhibit headers)
+        (r"(?m)^[A-Z][A-Z\s\d,.\-:]{4,}$", "caps_heading"),
+        # Title case short lines (likely headings, not sentences)
+        (r"(?m)^(?:[A-Z][a-z]+\s){1,6}$", "title_case_heading"),
+        # "TERM" means / "TERM" shall mean (definition blocks)
+        (r'(?m)^\"[A-Z][^\"]+\"\s+(?:means|shall mean)', "definition")
+    ]
 
-if __name__ == "__main__":
-    try_pdf_chunking()
+    for pattern, label in patterns:
+        for m in re.finditer(pattern, text):
+            boundaries.append((m.start(), label))
+
+    boundaries.sort(key=lambda x: x[0])
+    deduped = []
+    last_pos = -50
+    for pos, label in boundaries:
+        if pos - last_pos > 50:
+            deduped.append((pos, label))
+            last_pos = pos
+
+    return deduped
+
+def split_into_chunks(text, max_size=1500, min_size=100):
+    boundaries = detect_chunk_boundaries(text)
+
+    if not boundaries:
+        # No structure detected — fall back to paragraph splitting
+        return chunk_by_paragraphs(text, max_size)
+
+    # Cut text at each boundary
+    cut_points = [0] + [pos for pos, _ in boundaries] + [len(text)]
+    raw_chunks = [text[cut_points[i]:cut_points[i+1]].strip()
+                  for i in range(len(cut_points) - 1)]
+    raw_chunks = [c for c in raw_chunks if c]
+
+    return merge_and_split(raw_chunks, max_size, min_size)
+
+def merge_and_split(chunks, max_size, min_size):
+    merged = []
+    buffer = ""
+    for chunk in chunks:
+        if len(buffer) + len(chunk) < min_size:
+            buffer = (buffer + " " + chunk).strip()
+        else:
+            if buffer:
+                merged.append(buffer)
+            buffer = chunk
+    if buffer:
+        merged.append(buffer)
+
+    # Split oversized chunks on sentence boundaries
+    result = []
+    for chunk in merged:
+        if len(chunk) <= max_size:
+            result.append(chunk)
+        else:
+            result.extend(split_on_sentences(chunk, max_size))
+
+    return result
+
+def split_on_sentences(text, max_size):
+    """Last resort: split a large chunk into sentence-sized pieces."""
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    chunks = []
+    buffer = ""
+    for sentence in sentences:
+        if len(buffer) + len(sentence) <= max_size:
+            buffer = (buffer + " " + sentence).strip()
+        else:
+            if buffer:
+                chunks.append(buffer)
+            buffer = sentence
+    if buffer:
+        chunks.append(buffer)
+    return chunks
+
+def chunk_by_paragraphs(text, max_size):
+    paragraphs = re.split(r"\n{2,}", text)
+    return merge_and_split([p.strip() for p in paragraphs if p.strip()], max_size, min_size=100)
+
