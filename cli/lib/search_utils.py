@@ -2,8 +2,9 @@ import os
 from pathlib import Path
 import json
 
-DEFAULT_SEMANTIC_CHUNK_SIZE = 4
-DEFAULT_CHUNK_OVERLAP = 1
+DEFAULT_MAX_SEMANTIC_CHUNK_SIZE = 1500
+DEFAULT_MIN_SEMANTIC_CHUNK_SIZE = 100
+DEFAULT_CHUNK_OVERLAP = 200
 
 ROOT_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 PDF_TESTING_PATH = os.path.join(ROOT_PATH, "data", "pdf_testing")

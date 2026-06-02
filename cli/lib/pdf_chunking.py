@@ -4,7 +4,8 @@ import json
 import os
 from sentence_transformers import SentenceTransformer
 from .search_utils import (
-    DEFAULT_SEMANTIC_CHUNK_SIZE,
+    DEFAULT_MAX_SEMANTIC_CHUNK_SIZE,
+    DEFAULT_MIN_SEMANTIC_CHUNK_SIZE,
     DEFAULT_CHUNK_OVERLAP,
     CHUNK_EMBEDDINGS_PATH,
     CHUNK_METADATA_PATH,
@@ -34,7 +35,7 @@ class PdfChunkSearch:
             if not text.strip():
                 continue
 
-            doc_chunks = semantic_chunk(text)
+            doc_chunks = chunk_pdf(text)
 
             for i, chunk in enumerate(doc_chunks, 1):
                 all_chunks.append(chunk)
@@ -70,33 +71,10 @@ class PdfChunkSearch:
 
         return self.build_chunk_embeddings(documents)
 
-def semantic_chunk(
-        text: str,
-        max_chunk_size: int = DEFAULT_SEMANTIC_CHUNK_SIZE,
-        overlap: int = DEFAULT_CHUNK_OVERLAP) -> list[str]:
-    text.strip()
-    if not text:
-        return []
-
+def chunk_pdf(text, max_size=DEFAULT_MAX_SEMANTIC_CHUNK_SIZE, min_size=DEFAULT_MIN_SEMANTIC_CHUNK_SIZE):
     text = normalize_pdf_text(text)
-    sentences = re.split(r"(?<=[.!?])\s+", text)
+    return split_into_chunks(text, max_size, min_size)
 
-    chunks = []
-    i = 0
-    while i < len(sentences):
-        if len(sentences) == 1 and not sentences[0].endswith((".", "!", "?")):
-            chunk_sentences = sentences[0]
-            chunk = chunk_sentences.strip()
-        else:
-            chunk_sentences = sentences[i : i + max_chunk_size]
-            if chunks and len(chunk_sentences) <= overlap:
-                break
-            chunk = " ".join(chunk_sentences).strip()
-        if chunk:
-            chunks.append(chunk)
-        i += max_chunk_size - overlap
-
-    return chunks
 
 def normalize_pdf_text(text):
     text = re.sub(r"-\n", "", text)
@@ -108,45 +86,66 @@ def detect_chunk_boundaries(text):
     boundaries = []
     patterns =[
         # Numbered headings: "1.", "1.1", "A.", "IV."
-        (r"(?m)^(?:[A-Z]{1,4}\.|[IVXLC]+\.|[\d]+(?:\.[\d]+)*\.?)\s+[A-Z]", "numbered_heading"),
+        r"(?m)^(?:[A-Z]{1,4}\.|[IVXLC]+\.|[\d]+(?:\.[\d]+)*\.?)\s+[A-Z]",
         # ALL CAPS lines (section titles, exhibit headers)
-        (r"(?m)^[A-Z][A-Z\s\d,.\-:]{4,}$", "caps_heading"),
+        r"(?m)^[A-Z][A-Z\s\d,.\-:]{4,}$",
         # Title case short lines (likely headings, not sentences)
-        (r"(?m)^(?:[A-Z][a-z]+\s){1,6}$", "title_case_heading"),
+        r"(?m)^(?:[A-Z][a-z]+\s){1,6}$",
         # "TERM" means / "TERM" shall mean (definition blocks)
-        (r'(?m)^\"[A-Z][^\"]+\"\s+(?:means|shall mean)', "definition")
+        r'(?m)^\"[A-Z][^\"]+\"\s+(?:means|shall mean)'
     ]
 
-    for pattern, label in patterns:
+    for pattern in patterns:
         for m in re.finditer(pattern, text):
-            boundaries.append((m.start(), label))
+            boundaries.append(m.start())
 
     boundaries.sort(key=lambda x: x[0])
-    deduped = []
-    last_pos = -50
-    for pos, label in boundaries:
-        if pos - last_pos > 50:
-            deduped.append((pos, label))
-            last_pos = pos
 
-    return deduped
+    return boundaries
 
-def split_into_chunks(text, max_size=1500, min_size=100):
+def split_into_chunks(text,
+                      max_size=DEFAULT_MAX_SEMANTIC_CHUNK_SIZE,
+                      min_size=DEFAULT_MIN_SEMANTIC_CHUNK_SIZE,
+                      overlap_size = DEFAULT_CHUNK_OVERLAP):
+
     boundaries = detect_chunk_boundaries(text)
 
     if not boundaries:
-        # No structure detected — fall back to paragraph splitting
         return chunk_by_paragraphs(text, max_size)
 
-    # Cut text at each boundary
-    cut_points = [0] + [pos for pos, _ in boundaries] + [len(text)]
-    raw_chunks = [text[cut_points[i]:cut_points[i+1]].strip()
-                  for i in range(len(cut_points) - 1)]
-    raw_chunks = [c for c in raw_chunks if c]
+    split_points = [0]
+    for point in boundaries:
+        split_points.append(point)
+    split_points.append(len(text))
 
-    return merge_and_split(raw_chunks, max_size, min_size)
+    raw_chunks = []
+    for point in range(len(split_points) - 1):
+        new_chunk = text[split_points[point] : split_points[point + 1]].strip()
+        if new_chunk:
+            raw_chunks.append(new_chunk)
 
-def merge_and_split(chunks, max_size, min_size):
+    merged = merge_and_split(raw_chunks, max_size, min_size)
+
+    overlapped = []
+    for i, chunk in enumerate(merged):
+        if i > 0:
+            prefix = merged[i - 1][-overlap_size:]
+        else:
+            prefix = ""
+
+        if i < len(merged) - 1:
+            suffix = merged[i + 1][:overlap_size]
+        else:
+            suffix = ""
+
+        overlapped.append(f"{prefix} {chunk} {suffix}".strip())
+
+    return overlapped
+
+def merge_and_split(chunks,
+                    max_size=DEFAULT_MAX_SEMANTIC_CHUNK_SIZE,
+                    min_size=DEFAULT_MIN_SEMANTIC_CHUNK_SIZE):
+    """Merge undersized chunks and split oversized chunks"""
     merged = []
     buffer = ""
     for chunk in chunks:
@@ -159,7 +158,6 @@ def merge_and_split(chunks, max_size, min_size):
     if buffer:
         merged.append(buffer)
 
-    # Split oversized chunks on sentence boundaries
     result = []
     for chunk in merged:
         if len(chunk) <= max_size:
@@ -169,8 +167,8 @@ def merge_and_split(chunks, max_size, min_size):
 
     return result
 
-def split_on_sentences(text, max_size):
-    """Last resort: split a large chunk into sentence-sized pieces."""
+def split_on_sentences(text, max_size=DEFAULT_MAX_SEMANTIC_CHUNK_SIZE):
+    """Split a large chunk into sentence-sized pieces."""
     sentences = re.split(r"(?<=[.!?])\s+", text)
     chunks = []
     buffer = ""
@@ -187,5 +185,6 @@ def split_on_sentences(text, max_size):
 
 def chunk_by_paragraphs(text, max_size):
     paragraphs = re.split(r"\n{2,}", text)
-    return merge_and_split([p.strip() for p in paragraphs if p.strip()], max_size, min_size=100)
+    stripped_paragraphs = [p.strip() for p in paragraphs if p.strip()]
+    return merge_and_split(stripped_paragraphs, max_size)
 
