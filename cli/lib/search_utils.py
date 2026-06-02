@@ -5,6 +5,7 @@ import json
 DEFAULT_MAX_SEMANTIC_CHUNK_SIZE = 1500
 DEFAULT_MIN_SEMANTIC_CHUNK_SIZE = 100
 DEFAULT_CHUNK_OVERLAP = 200
+DEFAULT_SEARCH_LIMIT = 10
 
 ROOT_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 PDF_TESTING_PATH = os.path.join(ROOT_PATH, "data", "pdf_testing")

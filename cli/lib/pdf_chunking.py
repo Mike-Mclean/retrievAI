@@ -9,6 +9,7 @@ from .search_utils import (
     DEFAULT_CHUNK_OVERLAP,
     CHUNK_EMBEDDINGS_PATH,
     CHUNK_METADATA_PATH,
+    DEFAULT_SEARCH_LIMIT,
     load_parsed_pdfs,
     )
 
@@ -70,6 +71,26 @@ class PdfChunkSearch:
             return self.chunk_embeddings
 
         return self.build_chunk_embeddings(documents)
+
+    def generate_embedding(self, text: str) -> str:
+        if not text or not text.strip():
+            raise ValueError("Error: text doesn't exist or is only whitespace")
+        embedding = self.model.encode([text])
+        return embedding[0]
+
+    def search_chunks(self, query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
+        embedding = self.generate_embedding(query)
+        chunk_scores = []
+
+        for i, chunk_embedding in enumerate(self.chunk_embeddings):
+            similarity = cosine_similarity(embedding, chunk_embedding)
+            chunk_scores.append(
+                {
+                    "chunk_idx": self.chunk_metadata[i]["chunk_idx"],
+                    "document_id": self.chunk_metadata[i]["document_id"],
+                    #Add more data to the chunk scores.
+                }
+            )
 
 def chunk_pdf(text, max_size=DEFAULT_MAX_SEMANTIC_CHUNK_SIZE, min_size=DEFAULT_MIN_SEMANTIC_CHUNK_SIZE):
     text = normalize_pdf_text(text)
@@ -188,3 +209,12 @@ def chunk_by_paragraphs(text, max_size):
     stripped_paragraphs = [p.strip() for p in paragraphs if p.strip()]
     return merge_and_split(stripped_paragraphs, max_size)
 
+def cosine_similarity(vec1, vec2) -> float:
+    dot_product = np.dot(vec1, vec2)
+    norm1 = np.linalg.norm(vec1)
+    norm2 = np.linalg.norm(vec2)
+
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+
+    return dot_product / (norm1 * norm2)
