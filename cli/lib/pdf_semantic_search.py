@@ -45,7 +45,8 @@ class PdfSemanticSearch:
                     "document_title": doc["file_name"],
                     "page_number": doc["page"],
                     "chunk_id": i,
-                    "total_chunks": len(doc_chunks)
+                    "total_chunks": len(doc_chunks),
+                    "chunk_text": chunk
                 })
         self.chunk_embeddings = self.model.encode(all_chunks, show_progress_bar=True)
         self.chunk_metadata = metadata
@@ -84,16 +85,18 @@ class PdfSemanticSearch:
 
         for i, chunk_embedding in enumerate(self.chunk_embeddings):
             similarity = cosine_similarity(embedding, chunk_embedding)
+            chunk_data = self.chunk_metadata[i]
             chunk_scores.append(
-                {
-                    "chunk_id": self.chunk_metadata[i]["chunk_id"],
-                    "document_id": self.chunk_metadata[i]["document_id"],
-                    "page_number": self.chunk_metadata[i]["page_number"],
-                    "score": similarity
-                }
+                RetrievalResult(
+                    chunk_data["chunk_text"],
+                    chunk_data["document_title"],
+                    chunk_data["page_number"],
+                    similarity,
+                    chunk_data["chunk_id"]
+                )
             )
 
-        sorted_scores = sorted(chunk_scores, key=lambda score: score["score"], reverse=True)
+        sorted_scores = sorted(chunk_scores, key=lambda result: result.similarity, reverse=True)
         return sorted_scores[:limit]
 
 class RetrievalResult:
@@ -105,8 +108,16 @@ class RetrievalResult:
         self.similarity_score = similarity_score
         self.chunk_id = chunk_id
 
+    def __repr__(self):
+        return f"""Chunk_text: {self.chunk_text[:100]}\n
+        Source_pdf: {self.source_pdf}\n
+        Page_number: {self.page_number}\n
+        Chunk_similarity: {self.similarity_score}\n
+        Chunk_ID: {self.chunk_id}
+    """
+
 def retrieve(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[RetrievalResult]:
     documents = load_parsed_pdfs()
     pdf_search = PdfSemanticSearch()
     pdf_search.load_or_create_chunk_embeddings(documents)
-    search_results = pdf_search.search_chunks(query, limit)
+    return pdf_search.search_chunks(query, limit)
