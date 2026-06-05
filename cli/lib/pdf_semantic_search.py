@@ -96,7 +96,7 @@ class PdfSemanticSearch:
                 )
             )
 
-        sorted_scores = sorted(chunk_scores, key=lambda result: result.similarity, reverse=True)
+        sorted_scores = sorted(chunk_scores, key=lambda result: result.similarity_score, reverse=True)
         return sorted_scores[:limit]
 
 class RetrievalResult:

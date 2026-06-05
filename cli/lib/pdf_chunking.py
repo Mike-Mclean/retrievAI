@@ -33,9 +33,17 @@ def detect_chunk_boundaries(text):
         for m in re.finditer(pattern, text):
             boundaries.append(m.start())
 
-    boundaries.sort(key=lambda x: x[0])
+    boundaries.sort()
 
-    return boundaries
+    #Ignore boundaries within 50 characters of each other
+    last_bound = -50
+    new_bounds = []
+    for bound in boundaries:
+        if bound - last_bound > 50:
+            new_bounds.append(bound)
+            last_bound = bound
+
+    return new_bounds
 
 def split_into_chunks(text,
                       max_size=DEFAULT_MAX_SEMANTIC_CHUNK_SIZE,
