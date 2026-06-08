@@ -7,12 +7,20 @@ DEFAULT_MIN_SEMANTIC_CHUNK_SIZE = 100
 DEFAULT_CHUNK_OVERLAP = 200
 DEFAULT_SEARCH_LIMIT = 10
 
+BM25_K1 = 1.5
+BM25_B = 0.75
+
 ROOT_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 PDF_TESTING_PATH = os.path.join(ROOT_PATH, "data", "pdf_testing")
 CACHE_PATH = os.path.join(ROOT_PATH, "cache", "cache.json")
 CHUNK_EMBEDDINGS_PATH = os.path.join(ROOT_PATH, "cache","chunk_embeddings.npy")
 CHUNK_METADATA_PATH = os.path.join(ROOT_PATH, "cache","chunk_metadata.json")
 STOPWORDS_PATH = os.path.join(ROOT_PATH, "data", "stopwords.txt")
+
+INDEX_PATH = os.path.join(ROOT_PATH, "cache", "index.pkl")
+INDEX_DOCMAP_PATH = os.path.join(ROOT_PATH, "cache", "docmap.pkl")
+TERM_FREQ_PATH = os.path.join(ROOT_PATH, "cache", "term_frequencies.pkl")
+DOC_LENGTHS_PATH = os.join(ROOT_PATH, "cache", "doc_lengths.pkl")
 
 def list_pdf_documents(pdfs_path: str | Path | os.PathLike = PDF_TESTING_PATH):
     return os.listdir(pdfs_path)
