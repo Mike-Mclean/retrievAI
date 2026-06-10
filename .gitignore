@@ -14,4 +14,3 @@ wheels/
 /cache/
 .env
 output.txt
-/tests/

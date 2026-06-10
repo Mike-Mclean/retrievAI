@@ -15,7 +15,6 @@ from search_utils import (
     BM25_B
     )
 
-
 class InvertedIndex:
     def __init__(self):
         self.index = defaultdict(set)
@@ -30,16 +29,12 @@ class InvertedIndex:
             self.index[token].add(file_name)
         self.term_frequencies[file_name].update(tokenized_text)
 
-    def get_documents(self, term: str):
-        processed_term = term.lower()
-        return sorted(list(self.index[processed_term]))
-
     def build(self) -> None:
         documents = load_parsed_pdfs()
         for doc in documents:
             id = doc["id"]
             self.docmap[id] = doc["file_name"]
-            self.__add_document(id, (f"{doc["file_name"]} {doc["text"]}"))
+            self.__add_document(doc["file_name"], doc["text"])
 
     def save(self) -> None:
         with open(INDEX_PATH, 'wb') as index_file:
@@ -79,7 +74,7 @@ class InvertedIndex:
         except FileNotFoundError:
             print("Error: document lengths file not found")
 
-    def get_tf(self, file_name: int, term: str) -> int:
+    def get_tf(self, file_name: str, term: str) -> int:
         tokenized_term = preprocess_text(term)
         if len(tokenized_term) > 1:
             raise Exception("Error: term is greater than one word")
@@ -136,18 +131,26 @@ class InvertedIndex:
                 scores[doc_id] += self.bm25(doc_id, token)
 
         sorted_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+
         results = []
         for doc_id, score in sorted_scores[:limit]:
-            doc = self.docmap[doc_id]
-            formatted_result = {
-                doc_id: doc["id"],
-                "title": doc["title"],
-                "document": doc["description"],
-                score: score
-            }
-            results.append(formatted_result)
+            pdf_title = self.docmap[doc_id]
+            results.append(KeyWordSearchResult(doc_id, pdf_title, score))
 
         return results
+
+class KeyWordSearchResult:
+    def __init__(self, doc_id: str, pdf_title: str, bm25_score: float):
+        self.doc_id = doc_id
+        self.pdf_title = pdf_title
+        self.bm25_score = bm25_score
+
+    def __repr__(self):
+        return f"""
+        Doc Title: {self.pdf_title}
+        Similarity Score: {self.similarity_score}
+        Keyword Search score: {self.bm25_score}
+    """
 
 def preprocess_text(text: str) -> str:
     text = text.lower()
