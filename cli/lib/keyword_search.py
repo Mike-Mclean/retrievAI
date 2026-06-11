@@ -4,7 +4,7 @@ from nltk.stem import PorterStemmer
 import pickle
 import math
 
-from search_utils import (
+from cli.lib.search_utils import (
     load_stopwords,
     load_parsed_pdfs,
     INDEX_PATH,
@@ -12,8 +12,22 @@ from search_utils import (
     TERM_FREQ_PATH,
     DOC_LENGTHS_PATH,
     BM25_K1,
-    BM25_B
+    BM25_B,
+    DEFAULT_SEARCH_LIMIT
     )
+
+class KeyWordSearchResult:
+    def __init__(self, doc_id: str, pdf_title: str, bm25_score: float):
+        self.doc_id = doc_id
+        self.pdf_title = pdf_title
+        self.bm25_score = bm25_score
+
+    def __repr__(self):
+        return f"""
+        Doc Title: {self.pdf_title}
+        Similarity Score: {self.similarity_score}
+        Keyword Search score: {self.bm25_score}
+    """
 
 class InvertedIndex:
     def __init__(self):
@@ -24,6 +38,8 @@ class InvertedIndex:
 
     def __add_document(self, file_name, text):
         tokenized_text = preprocess_text(text)
+        if file_name not in self.doc_lengths:
+            self.doc_lengths[file_name] = 0
         self.doc_lengths[file_name] += len(tokenized_text)
         for token in set(tokenized_text):
             self.index[token].add(file_name)
@@ -122,7 +138,7 @@ class InvertedIndex:
         bm25_idf = self.get_bm25_idf(term)
         return bm25_tf * bm25_idf
 
-    def bm25_search(self, query: str, limit: int) -> list[dict]:
+    def bm25_search(self, query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[KeyWordSearchResult]:
         tokenized_query = preprocess_text(query)
 
         scores = defaultdict(float)
@@ -138,19 +154,6 @@ class InvertedIndex:
             results.append(KeyWordSearchResult(doc_id, pdf_title, score))
 
         return results
-
-class KeyWordSearchResult:
-    def __init__(self, doc_id: str, pdf_title: str, bm25_score: float):
-        self.doc_id = doc_id
-        self.pdf_title = pdf_title
-        self.bm25_score = bm25_score
-
-    def __repr__(self):
-        return f"""
-        Doc Title: {self.pdf_title}
-        Similarity Score: {self.similarity_score}
-        Keyword Search score: {self.bm25_score}
-    """
 
 def preprocess_text(text: str) -> str:
     text = text.lower()

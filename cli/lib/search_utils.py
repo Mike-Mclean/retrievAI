@@ -20,7 +20,7 @@ STOPWORDS_PATH = os.path.join(ROOT_PATH, "data", "stopwords.txt")
 INDEX_PATH = os.path.join(ROOT_PATH, "cache", "index.pkl")
 INDEX_DOCMAP_PATH = os.path.join(ROOT_PATH, "cache", "docmap.pkl")
 TERM_FREQ_PATH = os.path.join(ROOT_PATH, "cache", "term_frequencies.pkl")
-DOC_LENGTHS_PATH = os.join(ROOT_PATH, "cache", "doc_lengths.pkl")
+DOC_LENGTHS_PATH = os.path.join(ROOT_PATH, "cache", "doc_lengths.pkl")
 
 def list_pdf_documents(pdfs_path: str | Path | os.PathLike = PDF_TESTING_PATH):
     return os.listdir(pdfs_path)
