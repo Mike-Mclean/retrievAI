@@ -36,21 +36,24 @@ class InvertedIndex:
         self.term_frequencies = defaultdict(Counter)
         self.doc_lengths = defaultdict()
 
-    def __add_document(self, file_name, text):
+    def __add_document(self, id, text):
         tokenized_text = preprocess_text(text)
-        if file_name not in self.doc_lengths:
-            self.doc_lengths[file_name] = 0
-        self.doc_lengths[file_name] += len(tokenized_text)
+
+        if id not in self.doc_lengths:
+            self.doc_lengths[id] = 0
+        self.doc_lengths[id] += len(tokenized_text)
+
         for token in set(tokenized_text):
-            self.index[token].add(file_name)
-        self.term_frequencies[file_name].update(tokenized_text)
+            self.index[token].add(id)
+
+        self.term_frequencies[id].update(tokenized_text)
 
     def build(self) -> None:
         documents = load_parsed_pdfs()
         for doc in documents:
             id = doc["id"]
-            self.docmap[id] = doc["file_name"]
-            self.__add_document(doc["file_name"], doc["text"])
+            self.docmap[id] = doc
+            self.__add_document(id, f"{doc["file_name"]} {doc["text"]}")
 
     def save(self) -> None:
         with open(INDEX_PATH, 'wb') as index_file:
@@ -96,6 +99,7 @@ class InvertedIndex:
             raise Exception("Error: term is greater than one word")
 
         processed_term = tokenized_term[0]
+        print(processed_term)
         return self.term_frequencies[file_name][processed_term]
 
     def get_idf(self, term: str) -> float:
@@ -155,7 +159,7 @@ class InvertedIndex:
 
         return results
 
-def preprocess_text(text: str) -> str:
+def preprocess_text(text: str) -> list[str]:
     text = text.lower()
     table = str.maketrans('', '', string.punctuation)
     text = text.translate(table)
@@ -169,3 +173,11 @@ def preprocess_text(text: str) -> str:
     split_text = [stemmer.stem(word) for word in split_text]
 
     return split_text
+
+def test_term_freq_building():
+    index = InvertedIndex()
+    index.build()
+    print(index.term_frequencies)
+
+if __name__ == "__main__":
+    test_term_freq_building()
