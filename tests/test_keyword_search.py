@@ -24,12 +24,13 @@ class TestInvertedIndex(unittest.TestCase):
 
     def test_load_inverted_index(self):
         self.keyword_search.load()
-        self.assertTrue(INDEX_PATH.is_file())
+        index_file = Path(INDEX_PATH)
+        self.assertTrue(index_file.is_file())
 
     def test_get_tf(self):
-        file_name = "AudibleInc.pdf"
+        file_id = load_parsed_pdfs()[0]["id"]
         term = "Affiliate"
-        tf = self.keyword_search.get_tf(file_name, term)
+        tf = self.keyword_search.get_tf(file_id, term)
         self.assertIsInstance(tf, int)
 
     def test_get_idf(self):
@@ -38,9 +39,9 @@ class TestInvertedIndex(unittest.TestCase):
         self.assertIsInstance(idf, float)
 
     def test_get_tf_idf(self):
-        file_name = "AudibleInc.pdf"
+        file_id = load_parsed_pdfs()[0]["id"]
         term = "Affiliate"
-        tf_idf = self.keyword_search.get_tf_idf(file_name, term)
+        tf_idf = self.keyword_search.get_tf_idf(file_id, term)
         self.assertIsInstance(tf_idf, float)
 
     def test_get_bm25_idf(self):
@@ -49,15 +50,15 @@ class TestInvertedIndex(unittest.TestCase):
         self.assertIsInstance(bm_25_idf, float)
 
     def test_get_bm25_tf(self):
-        file_name = "AudibleInc.pdf"
+        file_id = load_parsed_pdfs()[0]["id"]
         term = "Affiliate"
-        bm25_tf = self.keyword_search.get_bm25_tf(file_name, term)
+        bm25_tf = self.keyword_search.get_bm25_tf(file_id, term)
         self.assertIsInstance(bm25_tf, float)
 
     def test_bm25(self):
-        file_name = "AudibleInc.pdf"
+        file_id = load_parsed_pdfs()[0]["id"]
         term = "Affiliate"
-        bm25 = self.keyword_search.bm25(file_name, term)
+        bm25 = self.keyword_search.bm25(file_id, term)
         self.assertIsInstance(bm25, float)
 
     def test_bm25_search(self):

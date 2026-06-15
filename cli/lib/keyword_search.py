@@ -65,7 +65,7 @@ class InvertedIndex:
         with open(TERM_FREQ_PATH, 'wb') as term_freq_file:
             pickle.dump(self.term_frequencies, term_freq_file)
 
-        with open(TERM_FREQ_PATH, 'wb') as doc_lengths_file:
+        with open(DOC_LENGTHS_PATH, 'wb') as doc_lengths_file:
             pickle.dump(self.doc_lengths, doc_lengths_file)
 
     def load(self) -> None:
@@ -93,14 +93,13 @@ class InvertedIndex:
         except FileNotFoundError:
             print("Error: document lengths file not found")
 
-    def get_tf(self, file_name: str, term: str) -> int:
+    def get_tf(self, file_id: str, term: str) -> int:
         tokenized_term = preprocess_text(term)
         if len(tokenized_term) > 1:
             raise Exception("Error: term is greater than one word")
 
         processed_term = tokenized_term[0]
-        print(processed_term)
-        return self.term_frequencies[file_name][processed_term]
+        return self.term_frequencies[file_id][processed_term]
 
     def get_idf(self, term: str) -> float:
         tokenized_term = preprocess_text(term)
@@ -112,8 +111,8 @@ class InvertedIndex:
         term_doc_count = len(self.index[token])
         return math.log((total_pages + 1) / (term_doc_count + 1))
 
-    def get_tf_idf(self, file_name: str, term: str) -> float:
-        return self.get_tf(file_name, term) * self.get_idf(term)
+    def get_tf_idf(self, file_id: str, term: str) -> float:
+        return self.get_tf(file_id, term) * self.get_idf(term)
 
     def get_bm25_idf(self, term: str) -> float:
         tokenized_term = preprocess_text(term)
@@ -130,15 +129,15 @@ class InvertedIndex:
             return 0.0
         return sum(self.doc_lengths.values()) / len(self.doc_lengths)
 
-    def get_bm25_tf(self, file_name: str, term: str, k1: float = BM25_K1, b: int = BM25_B) -> float:
-        basic_tf = self.get_tf(file_name, term)
-        doc_length = self.doc_lengths[file_name]
+    def get_bm25_tf(self, file_id: str, term: str, k1: float = BM25_K1, b: int = BM25_B) -> float:
+        basic_tf = self.get_tf(file_id, term)
+        doc_length = self.doc_lengths[file_id]
         avg_doc_length = self.__get_avg_doc_length()
         length_norm = 1 - b + b * (doc_length / avg_doc_length)
         return (basic_tf * (k1 + 1)) / (basic_tf + k1 * length_norm)
 
-    def bm25(self, file_name: str, term: str) -> float:
-        bm25_tf = self.get_bm25_tf(file_name, term)
+    def bm25(self, file_id: str, term: str) -> float:
+        bm25_tf = self.get_bm25_tf(file_id, term)
         bm25_idf = self.get_bm25_idf(term)
         return bm25_tf * bm25_idf
 
@@ -173,11 +172,3 @@ def preprocess_text(text: str) -> list[str]:
     split_text = [stemmer.stem(word) for word in split_text]
 
     return split_text
-
-def test_term_freq_building():
-    index = InvertedIndex()
-    index.build()
-    print(index.term_frequencies)
-
-if __name__ == "__main__":
-    test_term_freq_building()
