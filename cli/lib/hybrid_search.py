@@ -34,8 +34,8 @@ class HybridSearchResults:
 class HybridSearch:
     def __init__(self, documents):
         self.documents = documents
-        self.semantic_serach = PdfSemanticSearch()
-        self.semantic_serach.load_or_create_chunk_embeddings(documents)
+        self.semantic_search = PdfSemanticSearch()
+        self.semantic_search.load_or_create_chunk_embeddings(documents)
         self.index = InvertedIndex()
 
         if not os.path.exists(INDEX_PATH):
@@ -93,7 +93,7 @@ class HybridSearch:
         keyword_search_results = self._BM25_search(query, limit * 500)
         normalized_keyword_search = self.normalize_search_results(keyword_search_results)
 
-        semantic_search_results = self.semantic_serach.search_chunks(query, limit * 500)
+        semantic_search_results = self.semantic_search.search_chunks(query, limit * 500)
         normalized_semantic_search = self.normalize_search_results(semantic_search_results)
 
         combined_search_results = {}
@@ -115,5 +115,51 @@ class HybridSearch:
 
         return sorted(hybrid_search_results, key= lambda x: x.score, reverse=True)
 
+    def rrf_score(self, rank, k = DEFAULT_K):
+        return 1 / (k + rank)
 
+    def rrf_search(self, query, k = DEFAULT_K, limit = DEFAULT_SEARCH_LIMIT):
+        keyword_search_results = self.index.bm25_search(query, limit * 500)
+        semantic_search_results = self.semantic_search.search_chunks(query, limit * 500)
 
+        search_map = {}
+        for rank, result in enumerate(keyword_search_results, 1):
+            doc_id = result.doc_id
+            if doc_id not in search_map:
+                search_map[doc_id] = {
+                    "title": result.pdf_title,
+                    "rrf_score": 0.0,
+                    "keyword_rank": None,
+                    "semantic_rank": None
+                }
+            if search_map[doc_id]["keyword_rank"] is None:
+                search_map[doc_id]["keyword_rank"] = rank
+                search_map[doc_id]["rrf_score"] += self.rrf_score(rank, k)
+
+        for rank, result in enumerate(semantic_search_results, 1):
+            doc_id = result.doc_id
+            if doc_id not in search_map:
+                search_map[doc_id] = {
+                    "title": result.pdf_title,
+                    "rrf_score": 0.0,
+                    "keyword_rank": None,
+                    "semantic_rank": None
+                }
+            if search_map[doc_id]["semantic_rank"] is None:
+                search_map[doc_id]["semantic_rank"] = rank
+                search_map[doc_id]["rrf_score"] += self.rrf_score(rank, k)
+
+        sorted_items = sorted(search_map.items(), key=lambda x: x[1]["rrf_score"], reverse=True)
+
+        search_results = []
+        for doc_id, data in sorted_items:
+            result = HybridSearchResults(
+                doc_id = doc_id,
+                doc_title= data["title"],
+                score = data["rrf_score"],
+                keyword_score= data["keyword_rank"],
+                semantic_score= data["semantic_rank"]
+            )
+            search_results.append(result)
+
+        return search_results[:limit]

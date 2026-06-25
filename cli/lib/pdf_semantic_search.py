@@ -13,6 +13,24 @@ from .pdf_chunking import (
     cosine_similarity
 )
 
+class RetrievalResult:
+    def __init__(self, doc_id: str, chunk_text: str, source_pdf: str, page_number: int,
+                 similarity_score: float, chunk_id: int):
+        self.doc_id = doc_id
+        self.chunk_text = chunk_text
+        self.source_pdf = source_pdf
+        self.page_number = page_number
+        self.similarity_score = similarity_score
+        self.chunk_id = chunk_id
+
+    def __repr__(self):
+        return f"""Chunk_text: {self.chunk_text[:100]}\n
+        Source_pdf: {self.source_pdf}\n
+        Page_number: {self.page_number}\n
+        Chunk_similarity: {self.similarity_score}\n
+        Chunk_ID: {self.chunk_id}
+    """
+
 class PdfSemanticSearch:
     def __init__(self, model_name = 'all-MiniLM-L6-v2') -> None:
         self.model = SentenceTransformer(model_name)
@@ -79,7 +97,7 @@ class PdfSemanticSearch:
         embedding = self.model.encode([text])
         return embedding[0]
 
-    def search_chunks(self, query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
+    def search_chunks(self, query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[RetrievalResult]:
         embedding = self.generate_embedding(query)
         chunk_scores = []
 
@@ -88,6 +106,7 @@ class PdfSemanticSearch:
             chunk_data = self.chunk_metadata[i]
             chunk_scores.append(
                 RetrievalResult(
+                    chunk_data["document_id"],
                     chunk_data["chunk_text"],
                     chunk_data["document_title"],
                     chunk_data["page_number"],
@@ -98,23 +117,6 @@ class PdfSemanticSearch:
 
         sorted_scores = sorted(chunk_scores, key=lambda result: result.similarity_score, reverse=True)
         return sorted_scores[:limit]
-
-class RetrievalResult:
-    def __init__(self, chunk_text: str, source_pdf: str, page_number: int,
-                 similarity_score: float, chunk_id: int):
-        self.chunk_text = chunk_text
-        self.source_pdf = source_pdf
-        self.page_number = page_number
-        self.similarity_score = similarity_score
-        self.chunk_id = chunk_id
-
-    def __repr__(self):
-        return f"""Chunk_text: {self.chunk_text[:100]}\n
-        Source_pdf: {self.source_pdf}\n
-        Page_number: {self.page_number}\n
-        Chunk_similarity: {self.similarity_score}\n
-        Chunk_ID: {self.chunk_id}
-    """
 
 def retrieve(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[RetrievalResult]:
     documents = load_parsed_pdfs()
